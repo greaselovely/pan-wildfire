@@ -7,16 +7,27 @@ import requests
 import xmltodict
 import argparse
 from sys import argv
+import tabulate
+
+"""
+to do
+-refactor
+"""
 
 
 ############
+#
+fhname = 'file_hashes.txt'
+ufname = 'domains.txt'
+c2domains = 'known_malicious_domains.txt'
 # I know, and if you want to store the key somewhere else, I totally get it.
-api_key = 'enter_your_key_here'
+api_key = ''
 #
 ############
 
 file_ver_dict = {}
 url_ver_dict = {}
+domains_list = []
 ver_dict = { "0": "benign",  
             "1": "malware",  
             "2": "grayware", 
@@ -24,12 +35,13 @@ ver_dict = { "0": "benign",
             "5": "C2", 
             "-100": "verdict pending", 
             "-101": "error", 
-            "-102" : "not found", 
+            "-102": "not found", 
             "-103": "invalid hash" }
 
-lpath = pathlib.Path(__file__).parent
-file_hash = os.path.join(lpath, 'file_hashes.txt')
-urls_file = os.path.join(lpath, 'urls.txt')
+local_path = pathlib.Path(__file__).parent
+file_hash = pathlib.Path.joinpath(local_path, fhname)
+urls_file = pathlib.Path.joinpath(local_path, ufname)
+c2_file = pathlib.Path.joinpath(local_path, c2domains)
 
 def clear():
     os.system("cls" if os.name == "nt" else "clear")
@@ -68,7 +80,6 @@ def get_file_verdict():
             file_ver_dict[i] = file_verdict_response
         results(file_ver_dict, 'md5')
     except Exception as e:
-        i_hash_error += 1
         print(f'There was a problem submitting hash WildFire.  Verify API key or hashes and try again.\n{e}\n{response.status_code}')
         pass
 
@@ -81,7 +92,9 @@ def get_url_verdict():
     send it to results() to provide screen output of the results.
     """
     wf_url = "https://wildfire.paloaltonetworks.com/publicapi/get/verdict"
-    print('Checking WildFire URL Verdicts...\n')
+    
+    if not pathlib.Path.is_file(urls_file) or os.path.getsize(urls_file) == 0:
+        domain_gen()
     try:
         with open(urls_file, 'r') as uf:
             urls = uf.read().splitlines()
@@ -90,10 +103,13 @@ def get_url_verdict():
             response = requests.post(wf_url, files=payload)
             url_verdict_response = xmltodict.parse(response.text)
             url_ver_dict[i] = url_verdict_response
-        results(url_ver_dict, 'url')
+        if len(url_ver_dict) > 0:
+            print('Checking WildFire URL Verdicts...\n')
+            results(url_ver_dict, 'url')
+        else:
+            print("No domains to process...exiting\n\n")
     except Exception as e:
-        print(f'There was a problem submitting hash WildFire.  Verify API key or hashes and try again.\n{e}\n{response.status_code}')
-        pass
+        print(f'There was a problem submitting hash WildFire.\n\n{e}\n\n')
 
 def results(vdict: dict, xkey: str) -> None:
     """
@@ -113,13 +129,50 @@ def results(vdict: dict, xkey: str) -> None:
     
     data = {"Sample Submitted": vkey_list, "Verdicts": verd_list}
     df = pd.DataFrame.from_dict(data)
-    df = df.set_index(["Sample Submitted"])
-    print(df,'\n\n')
-    footer = {'Verdict':  ['benign', 'malware', 'grayware', 'phishing', 'C2'], 'Totals': [verd_list.count('benign'), verd_list.count('malware'), verd_list.count('grayware'), verd_list.count('phishing'), verd_list.count('C2')]}
+    print("Sample Submitted")
+    print(tabulate.tabulate(df, showindex=False))
+    footer = {'Verdict':  [f'{ver_dict.get("0")}', f'{ver_dict.get("1")}', f'{ver_dict.get("2")}', f'{ver_dict.get("4")}', f'{ver_dict.get("5")}'], 'Totals': [verd_list.count('benign'), verd_list.count('malware'), verd_list.count('grayware'), verd_list.count('phishing'), verd_list.count('C2')]}
     footer_df = pd.DataFrame.from_dict(footer)
     footer_df = footer_df.set_index('Verdict')
-    print(footer_df)
+    print("\n\nTotals\n" + tabulate.tabulate(footer_df), end='\n\n')
 
+def domain_gen():
+    """
+    There's a known_malicious_domains.txt file along with this file, 
+    so we just go grab it and grab 10 random domains_list from it
+    and append it to the domains_list list.  To avoid using this, 
+    create the domains.txt file, and enter a list of domains in it.
+    This is more of a demo mode type solution for this script.  
+    """
+    if pathlib.Path.is_file(c2_file) and os.path.getsize(c2_file) > 0:
+        domains_list_from_opendns = open(c2_file, 'r').read()
+    else:
+        print('[!]\tNothing to generate from, and everything else is empty...exiting\n\n')
+        quit()
+    
+    domains_list_from_opendns = domains_list_from_opendns.split()
+
+    import random
+
+    i = 0
+    while i < 10:
+        random_domain = random.choice(domains_list_from_opendns)
+        domains_list.append(random_domain)
+        i += 1
+    write_file()
+
+def write_file():
+    """
+    Since the domains.txt file was empty / didn't exist
+    we take the domain_gen results and save it to domains.txt
+    """
+    with open(urls_file, 'w') as f:
+        for domain in domains_list:
+            f.write(domain + '\n')
+
+def clear_domain_file():
+    with open(urls_file, 'w') as f:
+        f.write('')
 
 def main():
     clear()
@@ -129,6 +182,8 @@ def main():
         file, url = argue_with_me()
         if file: get_file_verdict()
         if url: get_url_verdict()
+
+    clear_domain_file()
 
 
 if __name__ == '__main__':
