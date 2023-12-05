@@ -24,38 +24,35 @@ options:
   -u, --url   Retrieve verdict for url list (must already have list stored)
 ```
 
+### Demo Mode
+If you don't give us domains to query in the domains.txt, we'll generate 10 random one's from
+our known_malicious_domains.txt and run the query.
+
 ### Output Example:
 ```
 Checking WildFire URL Verdicts...
 
-                        Verdicts
-Sample Submitted                
-sendspace.com             benign
-marbling.pe.kr           malware
-nacjalneg.info            benign
-pronline.ru               benign
-purplehoodie.com          benign
-qsng.cn                   benign
-comcast.net               benign
-seksburada.net           malware
-sportsmansclub.net        benign
-stock888.cn              malware
-fc2.com                   benign
-tathli.com               malware
-teamclouds.com            benign
-texaswhitetailfever.com   benign
-Hotfile.com               benign
-wadefamilytree.org       malware
-xnescat.info             malware
-Mail.Ru                   benign
-yt118.com                 benign 
+Sample Submitted
+--------------------------------------  -------
+blumenhof-wegleitner.at                 malware
+seminoc.com                             malware
+simulatebrain.com                       malware
+n1-headache.com                         benign
+frontierweldingllc.com                  malware
+bimnapratica.com                        malware
+garage-lecompte-rouen.fr                malware
+mepavex.nl                              benign
+evangelische-pfarrgemeinde-tuniberg.de  malware
+simpkinsedwards.co.uk                   benign
+--------------------------------------  -------
 
 
-          Totals
-Verdict         
-benign        13
-malware        6
-grayware       0
-phishing       0
-C2             0
+Totals
+--------  -
+benign    3
+malware   7
+grayware  0
+phishing  0
+C2        0
+--------  -
 ```

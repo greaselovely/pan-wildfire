@@ -1,13 +1,15 @@
 #!/usr/bin/env python
 
 import os
+import stat
+import json
 import pathlib
-import pandas as pd
 import requests
-import xmltodict
 import argparse
-from sys import argv
 import tabulate
+import xmltodict
+import pandas as pd
+from sys import argv
 
 """
 to do
@@ -20,8 +22,6 @@ to do
 fhname = 'file_hashes.txt'
 ufname = 'domains.txt'
 c2domains = 'known_malicious_domains.txt'
-# I know, and if you want to store the key somewhere else, I totally get it.
-api_key = ''
 #
 ############
 
@@ -59,6 +59,56 @@ def argue_with_me():
     url = args.url
     file = args.file
     return file, url
+
+def load_config():
+    """
+    Used to reference an external json file for
+    custom config items, for this we use it to 
+    store api_key from WildFire.  
+    """
+    file_name = 'config.json'
+    local_path = pathlib.Path(__file__).resolve().parent
+    config_path = pathlib.Path.joinpath(local_path, file_name)
+
+    try:
+        with open(config_path, 'r') as file:
+            config = json.load(file)
+        secure_file(config_path, file_name)
+        return config
+    except FileNotFoundError:
+        """
+        We'll build an empty config.json file.
+        Edit to use api_key
+        """
+        config_init_starter = {"authentication" : {"api_key" : ""}}
+        with open(config_path, 'w') as file:
+            json.dump(config_init_starter, file, indent=2)
+        print(f"\n\n[i]\tEmpty {file_name} created.")
+        secure_file(config_path, file_name)
+        return load_config()
+    except json.JSONDecodeError:
+        print(f"Error decoding JSON in '{config_path}'.")
+        return None
+
+def secure_file(config_path, file_name):
+    """
+    We want to make sure the API config is 
+    secured against open permissions so
+    we check the config file and enforce
+    permissions if they aren't correct.
+    """
+    if os.name == "nt":
+        import ctypes
+        attributes = ctypes.windll.kernel32.GetFileAttributesW(config_path)
+        is_read_only = attributes & 1
+        if not is_read_only:
+            ctypes.windll.kernel32.SetFileAttributesW(config_path, 1)
+    else:
+        current_permissions = stat.S_IMODE(os.lstat(config_path).st_mode)
+        if current_permissions != 0o600:
+            os.chmod(config_path, 0o600)
+            print(f"\n\n[i]\tFile {file_name} secured.\n")
+    return
 
 def get_file_verdict():
     """
@@ -176,6 +226,12 @@ def clear_domain_file():
 
 def main():
     clear()
+    global config, api_key
+    config = load_config()
+    api_key = config.get('authentication').get('api_key')
+    if api_key == "":
+        print("\n\n[!]\tNo API Key found in config.json.  Exiting.\n\n")
+        exit()
     if len(argv) == 1:
         get_url_verdict()
     else:
